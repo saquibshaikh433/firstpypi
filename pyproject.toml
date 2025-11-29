@@ -1,0 +1,20 @@
+[tool.poetry.repositories.FIRSTPYPI]
+name = "FIRSTPYPI"
+url = "https://test.pypi.org/legacy/"
+
+[project]
+name = "FIRSTPYPI"
+version = "0.0.1"
+description = "test package"
+authors = [
+    {name = "najmussaquib",email = "najmus.saquib@motilaloswal.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

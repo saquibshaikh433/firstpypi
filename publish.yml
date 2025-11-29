@@ -1,0 +1,83 @@
+name: Bump version & Publish (Poetry)
+
+on:
+  push:
+    branches:
+      - dev      # auto bump + TestPyPI
+      - main     # auto bump + PyPI
+  workflow_dispatch:  # optional manual trigger
+
+jobs:
+  bump-build-publish:
+    runs-on: ubuntu-latest
+
+    # Avoid infinite loop when CI pushes the bump commit
+    if: github.actor != 'github-actions[bot]'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+
+      - name: Show current version
+        run: |
+          echo "Current version:"
+          poetry version
+
+      # 🔹 Auto bump PATCH version on every push
+      - name: Bump version (patch)
+        id: bump
+        run: |
+          poetry version patch
+          NEW_VERSION=$(poetry version -s)
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit bumped version
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+
+      - name: Build package
+        run: |
+          poetry build
+
+      # 🔹 Publish to TestPyPI when on dev
+      - name: Publish to TestPyPI (dev branch)
+        if: github.ref == 'refs/heads/dev'
+        env:
+          POETRY_HTTP_BASIC_TESTPYPI_USERNAME: "__token__"
+          POETRY_HTTP_BASIC_TESTPYPI_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          poetry config repositories.testpypi https://test.pypi.org/legacy/
+          poetry publish -r testpypi --skip-existing --no-interaction
+
+      # 🔹 Publish to PyPI when on main
+      - name: Publish to PyPI (main branch)
+        if: github.ref == 'refs/heads/main'
+        env:
+          POETRY_HTTP_BASIC_PYPI_USERNAME: "__token__"
+          POETRY_HTTP_BASIC_PYPI_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          poetry publish --skip-existing --no-interaction
+
+      - name: Push changes
+        run: |
+          git push origin HEAD
